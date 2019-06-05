@@ -4,11 +4,12 @@ import numpy as np
 from replayBuffer import ReplayBuffer
 
 # import tensor libraries
-from keras.models import Model, Sequential
-from keras.layers import (Input, Conv2D, Dense,
-        Flatten, Concatenate, Multiply, Lambda)
-from keras.optimizers import Adam, SGD
-import keras.backend as K
+import tensorflow as tf
+from tensorflow.keras.regularizers import l2
+from tensorflow.keras.optimizers import RMSprop, SGD, Adam
+import tensorflow.keras.backend as K
+from tensorflow.keras.layers import Input, Conv2D, Flatten, Dense
+from tensorflow.keras import Model
 
 # random agent to help with training
 class RandomAgent:
@@ -61,71 +62,55 @@ class NoviceAgent:
 
 # class for the rl agent playing tic tac toe
 # aim is to force the bot to learn rules as well
-class Agent:
+class DeepQLearningAgent:
     # initialization function
     def __init__(self, board_size, epsilon = 0.01, gamma = 0.9,
-                 buffer_size = 30000, use_target_net = False):
+                 buffer_size = 3000, use_target_net = False):
         assert 0 <= epsilon and epsilon <= 1, "epsilon should be in 0 to 1, got {}".format(epsilon)
         assert 0 <= gamma and gamma <= 1, "gamma should be in 0 to 1, got {}".format(gamma)
 
         self._board_size = board_size
-        self._epsilon = epsilon
         self._gamma = gamma
 
         self._buffer = ReplayBuffer(buffer_size)
         self._buffer_size = buffer_size
 
         self._input_shape = (self._board_size, self._board_size, 1)
-        self._model_train, self._model_pred = self.agent_model()
+        self._model = self.agent_model()
         self._use_target_net = use_target_net
         if(use_target_net):
-            _, self._target_net = self.agent_model()
+            self._target_net = self.agent_model()
             self.update_target_net()
-
-    def get_epsilon(self):
-        return self._epsilon
-
-    def set_epsilon(self, epsilon):
-        self._epsilon = epsilon
 
     # get action value
     def get_qvalues(self, board, model = None):
         # board is assumed to be of shape 1, 1 * board_size**2
         if model is None:
-            model = self._model_pred
+            model = self._model
         q_values = model.predict(board)
         return q_values
 
-    # get the action using epsilon greedy policy
+    # get the action using greedy policy
     def move(self, move_type, board):
-        if(np.random.random() <= self._epsilon):
-            action = int(np.random.choice(list(range(len(board))), 1)[0])
-        else:
-            model_input = np.zeros(board.shape[0]+1)
-            model_input[-1] = move_type
-            model_input[:board.shape[0]] = board
-            q_values = self.get_qvalues(model_input.reshape(1, -1), self._model_pred)
-            action = int(np.argmax(q_values))
+        model_input = np.zeros(board.shape[0]+1)
+        model_input[-1] = move_type
+        model_input[:board.shape[0]] = board
+        q_values = self.get_qvalues(model_input.reshape(1, -1), self._model)
+        action = int(np.argmax(q_values))
         return action
 
     def agent_model(self):
         # move type added to the board itself in the input
         input_board = Input((1 + self._board_size ** 2,))
-        input_action = Input((self._board_size ** 2,))
         # total rows + columns + diagonals is total units
         x = Dense(self._board_size ** 2, activation = 'relu')(input_board)
         x = Dense(self._board_size ** 2, activation = 'relu')(x)
-        x = Dense(self._board_size ** 2, activation = 'linear', name = 'action_values')(x)
-        x = Multiply()([input_action, x])
-        out = Lambda(lambda x: K.sum(x, axis = 1), output_shape = (1,))(x)
+        out = Dense(self._board_size ** 2, activation = 'linear', name = 'action_values')(x)
 
-        model_train = Model(inputs = [input_board, input_action], outputs = out)
-        model_train.compile(optimizer = Adam(1e-4), loss = 'mean_squared_error')
+        model = Model(inputs = input_board, outputs = out)
+        model.compile(optimizer = RMSprop(1e-4), loss = 'mean_squared_error')
 
-        model_pred = Model(inputs = input_board,
-                           outputs = model_train.get_layer('action_values').output)
-
-        return model_train, model_pred
+        return model
 
     # save the current models, note that all models are saved
     def save_model(self, file_path = '', iteration = None):
@@ -133,9 +118,9 @@ class Agent:
             assert isinstance(iteration, int), "iteration should be an integer"
         else:
             iteration = 0
-        self._model_pred.save("{}/model_{:04d}_prediction.h5".format(file_path, iteration))
-        self._model_train.save("{}/model_{:04d}_train.h5".format(file_path, iteration))
-        self._target_net.save("{}/model_{:04d}_target.h5".format(file_path, iteration))
+        self._model.save("{}/model_{:04d}.h5".format(file_path, iteration))
+        if(self._use_target_net):
+            self._target_net.save("{}/model_{:04d}_target.h5".format(file_path, iteration))
 
     # load any existing models
     def load_model(self, file_path = '', iteration = None):
@@ -144,17 +129,15 @@ class Agent:
         else:
             iteration = 0
         try:
-            self._model_pred  = load_model("{}/model_{:04d}_prediction.h5".format(file_path, iteration))
-            self._model_train = load_model("{}/model_{:04d}_train.h5".format(file_path, iteration))
-            self._target_net  = load_model("{}/model_{:04d}_target.h5".format(file_path, iteration))
+            self._model = load_model("{}/model_{:04d}.h5".format(file_path, iteration))
+            if(self._use_target_net):
+                self._target_net  = load_model("{}/model_{:04d}_target.h5".format(file_path, iteration))
         except FileNotFoundError:
             print("Couldn't locate models at {}, check provided path".format(file_path))
 
     def print_model(self):
-        print('Training Model')
-        print(self._model_train.summary())
-        print('Prediction Model')
-        print(self._model_pred.summary())
+        print('Model')
+        print(self._model.summary())
         print('Target Network')
         print(self._target_net.summary())
 
@@ -185,33 +168,36 @@ class Agent:
         next_board_mod[:len(next_board)] = next_board
         next_board_mod = next_board_mod.reshape(1, -1)
 
-        self._buffer.add_data([board_mod, one_hot_action,
-                            reward, next_board_mod, done])
+        self._buffer.add_to_buffer([board_mod.reshape(1, -1), one_hot_action,
+                            reward, next_board_mod.reshape(1, -1), done])
 
     def reset_buffer(self, buffer_size = None):
         if(buffer_size is not None):
             self._buffer_size = buffer_size
         self._buffer = ReplayBuffer(self._buffer_size)
 
-    def train_agent(self, sample_size = 10000, epochs = 10, verbose = 0):
+    def train_agent(self, batch_size=64, verbose = 0):
         # calculate the discounted rewards on the fly
-        s, a, r, next_s, done = self._buffer.sample(sample_size)
+        s, a, r, next_s, done = self._buffer.sample(batch_size)
         not_done = 1 - done
-        current_model = self._target_net if self._use_target_net else self._model_pred
+        current_model = self._target_net if self._use_target_net else self._model
         discounted_reward = r + (self._gamma * np.max(self.get_qvalues(next_s, current_model), axis = 1).reshape(-1, 1)) * not_done
+        # calculate target using one hot action
+        target = self.get_qvalues(s, self._model)
+        target = discounted_reward * a + target * (1 - a)
         # train the model
-        self._model_train.fit([s, a], discounted_reward, epochs = epochs, verbose = verbose)
-        return self._model_train.evaluate([s, a], discounted_reward)
-
+        loss = self._model.train_on_batch(s, target)
+        loss = round(loss, 5)
+        return loss
     # target network outputs is what we try to predict
     # this network is static for a while and serves as "ground truth"
     def update_target_net(self):
         if(self._use_target_net):
-            self._target_net.set_weights(self._model_pred.get_weights())
+            self._target_net.set_weights(self._model.get_weights())
 
     # to update weights between competing agents
     def copy_weights_from_agent(self, agent_for_copy):
         assert isinstance(agent_for_copy, Agent), "Agent type is required for copy"
 
-        self._model_train.set_weights(agent_for_copy._model_train.get_weights())
-        self._target_net.set_weights(agent_for_copy._model_pred.get_weights())
+        self._model.set_weights(agent_for_copy._model.get_weights())
+        self._target_net.set_weights(agent_for_copy._model.get_weights())

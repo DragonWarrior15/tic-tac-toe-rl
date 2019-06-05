@@ -1,6 +1,8 @@
 import numpy as np
 
 # class for the tic tac toe environment
+# mandatory to call the reset function at first use, does initialization
+# and returns the board state
 class TicTacToe:
     # initialization
     def __init__(self, board_size = 3):
@@ -14,8 +16,8 @@ class TicTacToe:
             'lose'    : -1,
             'invalid' : -10
         }
-
-        self.initialize_vars()
+    def get_board_size(self):
+        return self._size
 
     def get_max_reward(self):
         return(max([x for x in self._rewards.values()]))
@@ -61,7 +63,8 @@ class TicTacToe:
             reward[num] = self._rewards['invalid']
 
             # terminate game to suppress invalid moves
-            return (self._board, reward, 0 ,1)
+            # returns next_s, r, winner, done
+            return (self._board, reward, 0, 1)
 
         # update column, row and diagonal sums
         self._zero_counts -= 1
