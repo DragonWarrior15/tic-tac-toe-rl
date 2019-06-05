@@ -12,8 +12,8 @@ class TicTacToe:
 
         self._rewards = {
             'win'     : 10,
-            'draw'    : 1,
-            'lose'    : -1,
+            'draw'    : 0,
+            'lose'    : -10,
             'invalid' : -10
         }
     def get_board_size(self):
@@ -64,7 +64,7 @@ class TicTacToe:
 
             # terminate game to suppress invalid moves
             # returns next_s, r, winner, done
-            return (self._board, reward, 0, 1)
+            return (self._board, reward, num*-1, 1)
 
         # update column, row and diagonal sums
         self._zero_counts -= 1

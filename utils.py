@@ -32,9 +32,9 @@ def play_game(agent_main, agent_env, env, epsilon=0.1, n_games=100, record=True)
         while(not done):
             if(turn != env_move):
                 if(np.random.random() < epsilon):
-                    a = np.random.randint(0, env.get_board_size())
+                    a = np.random.randint(0, env.get_board_size() ** 2)
                 else:
-                    a = agent_env.move(turn, s)
+                    a = agent_main.move(turn, s)
             else:
                 a = agent_env.move(turn, s)
             next_s, r, winner, done = env.step(turn, a)
@@ -86,4 +86,44 @@ def plot_rewards_losses(rewards, losses):
     axs[1].plot(np.array(losses))
     axs[1].set_title('Agent {}'.format('losses'))
 
+    plt.show()
+
+def plot_from_logs(data, title="Rewards and Loss Curve for Agent",
+                    loss_titles=['Loss']):
+    '''
+    utility function to plot the learning curves
+    loss_index is only applicable if the object is a
+    example usage:
+    plot_from_logs('model_logs/v12.csv', loss_titles=['Total Loss', 'Policy Gradient Loss', 'Entropy'])
+    plot_from_logs('model_logs/v11.csv')
+    '''
+    loss_count = 1
+    if(isinstance(data, str)):
+        # read from file and plot
+        data = pd.read_csv(data)
+        if(data['loss'].dtype == 'O'):
+            # get no of values in loss
+            loss_count = len(data.iloc[0, data.columns.tolist().index('loss')].replace('[', '').replace(']', '').split(','))
+            for i in range(loss_count):
+                data['loss_{:d}'.format(i)] = data['loss'].apply(lambda x: float(x.replace('[', '').replace(']', '').split(',')[i]))
+            if(len(loss_titles) != loss_count):
+                loss_titles = loss_titles[0] * loss_count
+    elif(isinstance(data, dict)):
+        # use the lists in dict to plot
+        pass
+    else:
+        print('Provide a dictionary or file path for the data')
+    fig, axs = plt.subplots(2 + loss_count, 1, figsize=(8, 8))
+    # plot reward mean values
+    axs[0].plot(data['iteration'], data['reward_mean'])
+    axs[0].set_ylabel('Mean Reward')
+    axs[0].set_title(title)
+    # plot count of wins
+    axs[1].plot(data['iteration'], data['wins'])
+    axs[1].set_ylabel('Win Count')
+    for i in range(loss_count):
+        axs[i+2].plot(data['iteration'], data['loss_{:d}'.format(i) if loss_count > 1 else 'loss'])
+        axs[i+2].set_ylabel(loss_titles[i])
+        axs[i+2].set_xlabel('Iteration')
+    plt.tight_layout()
     plt.show()

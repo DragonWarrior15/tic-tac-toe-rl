@@ -64,9 +64,7 @@ class NoviceAgent:
 # aim is to force the bot to learn rules as well
 class DeepQLearningAgent:
     # initialization function
-    def __init__(self, board_size, epsilon = 0.01, gamma = 0.9,
-                 buffer_size = 3000, use_target_net = False):
-        assert 0 <= epsilon and epsilon <= 1, "epsilon should be in 0 to 1, got {}".format(epsilon)
+    def __init__(self, board_size, gamma=0.9, buffer_size=3000, use_target_net=False):
         assert 0 <= gamma and gamma <= 1, "gamma should be in 0 to 1, got {}".format(gamma)
 
         self._board_size = board_size
@@ -103,12 +101,12 @@ class DeepQLearningAgent:
         # move type added to the board itself in the input
         input_board = Input((1 + self._board_size ** 2,))
         # total rows + columns + diagonals is total units
-        x = Dense(self._board_size ** 2, activation = 'relu')(input_board)
+        x = Dense(2 * (self._board_size ** 2), activation = 'relu')(input_board)
         x = Dense(self._board_size ** 2, activation = 'relu')(x)
         out = Dense(self._board_size ** 2, activation = 'linear', name = 'action_values')(x)
 
         model = Model(inputs = input_board, outputs = out)
-        model.compile(optimizer = RMSprop(1e-4), loss = 'mean_squared_error')
+        model.compile(optimizer = RMSprop(5e-4), loss = 'mean_squared_error')
 
         return model
 

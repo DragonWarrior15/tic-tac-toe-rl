@@ -1,0 +1,24 @@
+{
+    "model_versions":{
+        "v02":{
+            "agent_type"     :"DeepQLearningAgent",
+            "reward"         :"-10/10 reward",
+            "layers"         :"2*(3**2), 3**2",
+            "batch_size"     :64,
+            "board_size"     :3,
+            "buffer_size"    :3000,
+            "iterations"     :100000,
+            "optimizer"      :"RMSprop(0.0005)"
+        },
+        "v03":{
+            "agent_type"     :"DeepQLearningAgent",
+            "reward"         :"-10/10 reward",
+            "layers"         :"2*(3**2), 2*(3**2), 3**2",
+            "batch_size"     :64,
+            "board_size"     :3,
+            "buffer_size"    :10000,
+            "iterations"     :100000,
+            "optimizer"      :"RMSprop(0.0005)"
+        }
+    }
+}

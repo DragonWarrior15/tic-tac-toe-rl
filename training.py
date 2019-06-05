@@ -10,11 +10,11 @@ from utils import play_game
 from tqdm import tqdm
 
 board_size = 3
-version = 'v01'
-log_frequency = 100
-episodes = 10000
+version = 'v03'
+log_frequency = 500
+episodes = 100000
 
-agent = DeepQLearningAgent(board_size, epsilon=0.5, use_target_net=True, buffer_size=3000)
+agent = DeepQLearningAgent(board_size, use_target_net=True, buffer_size=10000)
 agent_random = NoviceAgent(board_size)
 env = TicTacToe()
 # cold start problem, add some games to buffer for training
@@ -32,23 +32,24 @@ decay = 0.99
 epsilon_end = 0.01
 
 # training loop
-model_logs = {'iteration':[], 'reward_mean':[], 'reward_dev':[], 'loss':[]}
+model_logs = {'iteration':[], 'reward_mean':[], 'reward_dev':[], 'wins':[],  'draws':[], 'loss':[]}
 for index in tqdm(range(episodes)):
     # make small changes to the buffer and slowly train
     win_counts, current_rewards = play_game(agent, agent_random, env, epsilon=epsilon,
                         n_games=10, record=True)
     loss = agent.train_agent(batch_size=64)
-
     # check performance every once in a while
     if((index+1)%log_frequency == 0):
         model_logs['loss'].append(loss)
         # keep track of agent rewards_history
-        _, current_rewards = play_game(agent, agent_random, env, epsilon=-1, n_games=10,
+        current_wins, current_rewards = play_game(agent, agent_random, env, epsilon=-1, n_games=10,
                                     record=False)
         model_logs['iteration'].append(index+1)
         model_logs['reward_mean'].append(round(np.mean(current_rewards), 2))
         model_logs['reward_dev'].append(round(np.std(current_rewards), 2))
-        pd.DataFrame(model_logs)[['iteration', 'reward_mean', 'reward_dev', 'loss']].to_csv('model_logs/{:s}.csv'.format(version), index=False)
+        model_logs['wins'].append(current_wins['win'])
+        model_logs['draws'].append(current_wins['draw'])
+        pd.DataFrame(model_logs)[['iteration', 'reward_mean', 'reward_dev', 'wins', 'draws', 'loss']].to_csv('model_logs/{:s}.csv'.format(version), index=False)
 
     # copy weights to target network and save models
     if((index+1)%log_frequency == 0):
