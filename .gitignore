@@ -1,2 +1,9 @@
 models/
 __pycache__/
+Include/
+Scripts/
+Lib/
+pyvenv.cfg
+virtual-env/
+virtual-env-gpu/
+package_downloads/

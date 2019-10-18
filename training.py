@@ -10,12 +10,12 @@ from utils import play_game
 from tqdm import tqdm
 
 board_size = 3
-version = 'v03'
-log_frequency = 500
-episodes = 100000
+version = 'v04'
+log_frequency = 10
+episodes = 100
 
-agent = DeepQLearningAgent(board_size, use_target_net=True, buffer_size=10000)
-agent_random = NoviceAgent(board_size)
+agent = DeepQLearningAgent(board_size, use_target_net=True, buffer_size=5000)
+agent_random = RandomAgent(board_size)
 env = TicTacToe()
 # cold start problem, add some games to buffer for training
 _, _ = play_game(agent, agent_random, env, epsilon=1, n_games=100, record=True)
@@ -54,6 +54,8 @@ for index in tqdm(range(episodes)):
     # copy weights to target network and save models
     if((index+1)%log_frequency == 0):
         agent.update_target_net()
+        if(not os.path.exists('models/{:s}'.format(version))):
+            os.mkdir('models/{:s}'.format(version))
         agent.save_model(file_path='models/{:s}'.format(version), iteration=(index+1))
         # keep some epsilon alive for training
         epsilon = max(epsilon * decay, epsilon_end)

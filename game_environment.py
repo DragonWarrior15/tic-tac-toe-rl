@@ -81,8 +81,8 @@ class TicTacToe:
 
     # check if valid move has been made
     def is_valid_move(self, num, position):
-        assert isinstance(position, int), \
-          "position should be of type int, but is of type {} instead".format(type(position))
+        # assert isinstance(position, int), \
+          # "position should be of type int, but is of type {} instead".format(type(position))
         assert 0 <= position and position < len(self._board), \
           "position should be in range({}, {}), but is {} instead".format(0, len(self._board), position)
         assert num in [-1, 1], "played number should be -1 or 1, but is {} instead".format(num)

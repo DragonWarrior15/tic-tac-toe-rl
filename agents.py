@@ -10,6 +10,7 @@ from tensorflow.keras.optimizers import RMSprop, SGD, Adam
 import tensorflow.keras.backend as K
 from tensorflow.keras.layers import Input, Conv2D, Flatten, Dense
 from tensorflow.keras import Model
+from tensorflow.keras.models import load_model
 
 # random agent to help with training
 class RandomAgent:
@@ -17,9 +18,8 @@ class RandomAgent:
         self._board_size = board_size
 
     def move(self, move_type, board):
-        valid_moves = [i for i in range(len(board)) if board[i] == 0]
-        assert len(valid_moves) > 0, "Invalid board for random agent"
-        return int(np.random.choice(valid_moves, 1)[0])
+        assert (board == 0).sum() > 0, "Invalid board for random agent"
+        return np.argmax(np.random.random(board.shape) * (board == 0))
 
 # novice player is slightly smart, will try to form a 3 in a row
 # or block, as we want the agent to learn these strategies
@@ -90,23 +90,47 @@ class DeepQLearningAgent:
 
     # get the action using greedy policy
     def move(self, move_type, board):
-        model_input = np.zeros(board.shape[0]+1)
-        model_input[-1] = move_type
-        model_input[:board.shape[0]] = board
-        q_values = self.get_qvalues(model_input.reshape(1, -1), self._model)
+        q_values = self.get_qvalues(self.transform_board(move_type, board), self._model)
         action = int(np.argmax(q_values))
         return action
 
+    # transform the input board as relevant for the model
+    def transform_board(self, move_type, board):
+        if(False):
+            # this will flatten the input
+            return_board = np.zeros(board.shape[0]+1)
+            return_board[-1] = move_type
+            return_board[:-1] = board
+            return_board.reshape(1, -1)
+        else:
+            # this will maintain a 2d shape
+            # add a function to transform the board into matrix of 2 x size x size
+            # first plane corresponds to current player, and second to opposite player
+            return_board = np.zeros((1, self._board_size, self._board_size, 2))
+            return_board[0, :,:,0] = (board.reshape((self._board_size, self._board_size)) == move_type).astype(int)
+            return_board[0, :,:,1] = (board.reshape((self._board_size, self._board_size)) == (move_type * -1)).astype(int)
+        return return_board
+
     def agent_model(self):
-        # move type added to the board itself in the input
-        input_board = Input((1 + self._board_size ** 2,))
-        # total rows + columns + diagonals is total units
-        x = Dense(2 * (self._board_size ** 2), activation = 'relu')(input_board)
-        x = Dense(self._board_size ** 2, activation = 'relu')(x)
-        out = Dense(self._board_size ** 2, activation = 'linear', name = 'action_values')(x)
+        if(False):
+            # this is the flattened version of the board as input
+            # move type added to the board itself in the input
+            input_board = Input((1 + self._board_size ** 2,))
+            # total rows + columns + diagonals is total units
+            x = Dense(2 * (self._board_size ** 2), activation = 'relu')(input_board)
+            x = Dense(self._board_size ** 2, activation = 'relu')(x)
+            x = Dense(self._board_size ** 2, activation = 'relu')(x)
+            out = Dense(self._board_size ** 2, activation = 'linear', name = 'action_values')(x)
+        else:
+            # this preserves the 2d shape of the board
+            input_board = Input((self._board_size, self._board_size, 2, ))
+            x = Conv2D(18, (3,3), activation = 'relu', data_format='channels_last')(input_board)
+            x = Flatten()(x)
+            x = Dense(9, activation = 'relu')(x)
+            out = Dense(self._board_size**2, activation = 'linear', name = 'action_values')(x)
 
         model = Model(inputs = input_board, outputs = out)
-        model.compile(optimizer = RMSprop(5e-4), loss = 'mean_squared_error')
+        model.compile(optimizer = RMSprop(5e-5), loss = 'mean_squared_error')
 
         return model
 
@@ -156,18 +180,12 @@ class DeepQLearningAgent:
                             one_hot_action, discounted_reward])
         '''
         # append move type to board
-        board_mod = np.zeros(len(board)+1)
-        board_mod[-1] = move_type
-        board_mod[:len(board)] = board
-        board_mod = board_mod.reshape(1, -1)
+        board_mod = self.transform_board(move_type, board)
         # append move type to next board
-        next_board_mod = np.zeros(len(next_board)+1)
-        next_board_mod[-1] = move_type
-        next_board_mod[:len(next_board)] = next_board
-        next_board_mod = next_board_mod.reshape(1, -1)
+        next_board_mod = self.transform_board(move_type, next_board)
 
-        self._buffer.add_to_buffer([board_mod.reshape(1, -1), one_hot_action,
-                            reward, next_board_mod.reshape(1, -1), done])
+        self._buffer.add_to_buffer([board_mod, one_hot_action,
+                            reward, next_board_mod, done])
 
     def reset_buffer(self, buffer_size = None):
         if(buffer_size is not None):
@@ -198,4 +216,4 @@ class DeepQLearningAgent:
         assert isinstance(agent_for_copy, Agent), "Agent type is required for copy"
 
         self._model.set_weights(agent_for_copy._model.get_weights())
-        self._target_net.set_weights(agent_for_copy._model.get_weights())
+        self._target_net.set_weights(agent_for_copy._model.get_weights())    

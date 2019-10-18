@@ -19,6 +19,16 @@
             "buffer_size"    :10000,
             "iterations"     :100000,
             "optimizer"      :"RMSprop(0.0005)"
+        },
+        "v04":{
+            "agent_type"     :"DeepQLearningAgent",
+            "reward"         :"-10/10 reward",
+            "layers"         :"18 3x3, 9 dense",
+            "batch_size"     :64,
+            "board_size"     :3,
+            "buffer_size"    :10000,
+            "iterations"     :100000,
+            "optimizer"      :"RMSprop(0.0005)"
         }
     }
 }
